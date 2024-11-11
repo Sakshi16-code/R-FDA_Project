@@ -1,21 +1,12 @@
+# Ensure all required packages are installed and loaded
 install_if_missing <- function(package) {
   if (!require(package, character.only = TRUE)) {
-    message(paste("Installing", package))
     install.packages(package, dependencies = TRUE)
     library(package, character.only = TRUE)
-  } else {
-    message(paste(package, "is already installed and loaded as a library."))
   }
 }
-
-# List of packages to install
-packages <- c("officer", "fda", "admiral", "plotly", "tidyverse", "pharmaverseadam")
-
-# Install each package in the list
-for (pkg in packages) {
-  install_if_missing(pkg)
-}
-
+packages <- c("officer", "fda", "admiral", "plotly", "tidyverse", "pharmaverseadam", "htmlwidgets")
+lapply(packages, install_if_missing)
 
 # Function to simulate data
 fake_curves <- function(n_curves = 100, n_points = 80, max_time = 100){
@@ -24,65 +15,80 @@ fake_curves <- function(n_curves = 100, n_points = 80, max_time = 100){
   t <- vector(mode = "list", length = n_curves)
   
   for (i in 1:n_curves){
-    t[i] <- list(sort(runif(n_points,0,max_time)))
+    t[i] <- list(sort(runif(n_points, 0, max_time)))
     x[i] <- list(cumsum(rnorm(n_points)) / sqrt(n_points))
   }
-  df <- tibble(ID,t,x)
+  df <- tibble(ID, t, x)
   names(df) <- c("ID", "Time", "Curve")
   return(df)
 }
+
+# Generate the data
 set.seed(123)
 n_curves <- 40
 n_points <- 80
 max_time <- 100
-df <- fake_curves(n_curves = n_curves,n_points = n_points, max_time = max_time)
-head(df)
+df <- fake_curves(n_curves = n_curves, n_points = n_points, max_time = max_time)
 
-df_1 <- df %>% select(!c(ID,Curve)) %>% unnest_longer(Time) 
-df_2 <- df %>% select(!c(ID,Time)) %>% unnest_longer(Curve)
-ID <- sort(rep(1:n_curves,n_points))
-df_l <- cbind(ID,df_1,df_2)
-p <- ggplot(df_l, aes(x = Time, y = Curve, group = ID, col = ID)) +
-  geom_line()
-p
+# Data preparation for ggplot
+df_1 <- df %>% select(!c(ID, Curve)) %>% unnest_longer(Time)
+df_2 <- df %>% select(!c(ID, Time)) %>% unnest_longer(Curve)
+ID <- sort(rep(1:n_curves, n_points))
+df_l <- cbind(ID, df_1, df_2)
 
-knots    = c(seq(0,max_time,5)) #Location of knots
-n_knots   = length(knots) #Number of knots
-n_order   = 4 # order of basis functions: for cubic b-splines: order = 3 + 1
-n_basis   = length(knots) + n_order - 2;
-basis = create.bspline.basis(rangeval = c(0,max_time), n_basis)
-plot(basis)
+# Plot the simulated data with ggplot
+p <- ggplot(df_l, aes(x = Time, y = Curve, group = ID, col = as.factor(ID))) +
+  geom_line() +
+  labs(title = "Simulated Functional Data", x = "Time", y = "Curve Value") +
+  theme_minimal()
+print(p)
 
+# Save the ggplot as PNG
+ggsave("curve_plot.png", plot = p, width = 8, height = 5)
+
+# Create B-spline basis
+knots <- seq(0, max_time, by = 5)
+n_order <- 4
+n_basis <- length(knots) + n_order - 2
+basis <- create.bspline.basis(rangeval = c(0, max_time), nbasis = n_basis)
+
+# Plot and save the basis plot
+png("basis_plot.png", width = 800, height = 600)
+plot(basis, main = "B-Spline Basis Functions")
+dev.off()
+
+# Convert data into functional data object
 argvals <- matrix(df_l$Time, nrow = n_points, ncol = n_curves)
 y_mat <- matrix(df_l$Curve, nrow = n_points, ncol = n_curves)
-
 W.obj <- Data2fd(argvals = argvals, y = y_mat, basisobj = basis, lambda = 0.5)
 
+# Calculate mean and standard deviation for the functional data
 W_mean <- mean.fd(W.obj)
 W_sd <- std.fd(W.obj)
-# Create objects for the standard upper and lower standard deviation
-SE_u <- fd(basisobj = basis)
-SE_l <- fd(basisobj = basis)
-# Fill in the sd values
-SE_u$coefs <- W_mean$coefs +  1.96 * W_sd$coefs/sqrt(n_curves) 
-SE_l$coefs <- W_mean$coefs -  1.96 * W_sd$coefs/sqrt(n_curves)
 
-plot(W.obj, xlab="Time", ylab="", lty = 1)
-## [1] "done"
-title(main = "Smoothed Curves")
-lines(SE_u, lwd = 3, lty = 3)
-lines(SE_l, lwd = 3, lty = 3)
-lines(W_mean,  lwd = 3)
+# Create objects for upper and lower standard deviations
+SE_u <- fd(coef = W_mean$coefs + 1.96 * W_sd$coefs / sqrt(n_curves), basisobj = basis)
+SE_l <- fd(coef = W_mean$coefs - 1.96 * W_sd$coefs / sqrt(n_curves), basisobj = basis)
 
+# Plot the smoothed curves with confidence intervals
+png("smoothed_curves.png", width = 800, height = 600)
+plot(W.obj, xlab = "Time", ylab = "Value", main = "Smoothed Functional Data", lty = 1)
+lines(SE_u, col = "blue", lwd = 2, lty = 2)
+lines(SE_l, col = "red", lwd = 2, lty = 2)
+lines(W_mean, col = "darkgreen", lwd = 3)
+legend("topright", legend = c("Mean", "Upper Bound", "Lower Bound"),
+       col = c("darkgreen", "blue", "red"), lty = c(1, 2, 2), lwd = 2)
+dev.off()
 
-days <- seq(0,100, by=2)
+# Create and save the interactive covariance surface plot
+days <- seq(0, max_time, by = 2)
 cov_W <- var.fd(W.obj)
-var_mat <-  eval.bifd(days,days,cov_W)
+var_mat <- eval.bifd(days, days, cov_W)
+
 fig <- plot_ly(x = days, y = days, z = ~var_mat) %>% 
-  add_surface(contours = list(
-    z = list(show=TRUE,usecolormap=TRUE, highlightcolor="#ff0000", project=list(z=TRUE))))
+  add_surface(contours = list(z = list(show = TRUE, usecolormap = TRUE, project = list(z = TRUE)))) %>%
+  layout(scene = list(camera = list(eye = list(x = 1.87, y = 0.88, z = -0.64))))
+htmlwidgets::saveWidget(fig, "covariance_surface.html")
 
-fig <- fig %>% 
-  layout(scene = list(camera=list(eye = list(x=1.87, y=0.88, z=-0.64))))
-
+# Display the saved interactive plot
 fig
