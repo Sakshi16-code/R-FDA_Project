@@ -1,0 +1,16 @@
+[1] "Simulation data generated"
+Outlier indices: 1 3 5 6 8 11 14 16 18 20 22 24 27 29 30 32 35 37 42 43 47 48 50 51 53 54 55 56 57 58 59 60 62 67 68 70 71 74 76 79 81 82 83 84 86 89 91 96 97 99 
+[1] "Curves matrix extracted"
+[1] "Treatment groups assigned"
+[1] "Data reshaped for plotting"
+[1] "Plotting Model 4 Curves"
+[1] "B-spline basis created"
+RStudioGD 
+        2 
+[1] "Data split into two treatment groups"
+[1] "Data converted to functional data objects"
+[1] "Derivatives evaluated"
+[1] "Velocity and acceleration plots"
+[1] "Two-sample t-test performed"
+[1] "Plotting t-test statistics"
+[1] "Creating phase space animation"
