@@ -1,0 +1,15 @@
+
+# List of required R packages
+tidyverse
+devtools
+FDA
+survival
+lme4
+haven
+ggplot2
+dplyr
+rmarkdown
+shiny
+DT
+lubridate
+

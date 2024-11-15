@@ -1,11 +1,11 @@
-# Ensure all required packages are installed and loaded
+# Ensure required packages from FDA, tidyverse, and admiral are installed and loaded
 install_if_missing <- function(package) {
   if (!require(package, character.only = TRUE)) {
     install.packages(package, dependencies = TRUE)
     library(package, character.only = TRUE)
   }
 }
-packages <- c("officer", "fda", "admiral", "plotly", "tidyverse", "pharmaverseadam", "htmlwidgets")
+packages <- c("fda", "tidyverse", "admiral")
 lapply(packages, install_if_missing)
 
 # Function to simulate data
@@ -43,8 +43,8 @@ p <- ggplot(df_l, aes(x = Time, y = Curve, group = ID, col = as.factor(ID))) +
   theme_minimal()
 print(p)
 
-# Save the ggplot as PNG
-ggsave("curve_plot.png", plot = p, width = 8, height = 5)
+# Save the ggplot as PNG in the current working directory
+ggsave(file.path(getwd(), "curve_plot.png"), plot = p, width = 8, height = 5)
 
 # Create B-spline basis
 knots <- seq(0, max_time, by = 5)
@@ -52,8 +52,8 @@ n_order <- 4
 n_basis <- length(knots) + n_order - 2
 basis <- create.bspline.basis(rangeval = c(0, max_time), nbasis = n_basis)
 
-# Plot and save the basis plot
-png("basis_plot.png", width = 800, height = 600)
+# Plot and save the basis plot in the current working directory
+png(file.path(getwd(), "basis_plot.png"), width = 800, height = 600)
 plot(basis, main = "B-Spline Basis Functions")
 dev.off()
 
@@ -70,8 +70,8 @@ W_sd <- std.fd(W.obj)
 SE_u <- fd(coef = W_mean$coefs + 1.96 * W_sd$coefs / sqrt(n_curves), basisobj = basis)
 SE_l <- fd(coef = W_mean$coefs - 1.96 * W_sd$coefs / sqrt(n_curves), basisobj = basis)
 
-# Plot the smoothed curves with confidence intervals
-png("smoothed_curves.png", width = 800, height = 600)
+# Plot the smoothed curves with confidence intervals and save in the current working directory
+png(file.path(getwd(), "smoothed_curves.png"), width = 800, height = 600)
 plot(W.obj, xlab = "Time", ylab = "Value", main = "Smoothed Functional Data", lty = 1)
 lines(SE_u, col = "blue", lwd = 2, lty = 2)
 lines(SE_l, col = "red", lwd = 2, lty = 2)
@@ -80,15 +80,14 @@ legend("topright", legend = c("Mean", "Upper Bound", "Lower Bound"),
        col = c("darkgreen", "blue", "red"), lty = c(1, 2, 2), lwd = 2)
 dev.off()
 
-# Create and save the interactive covariance surface plot
+# Create the covariance surface plot using admiral and plotly functions (if necessary)
 days <- seq(0, max_time, by = 2)
 cov_W <- var.fd(W.obj)
 var_mat <- eval.bifd(days, days, cov_W)
 
-fig <- plot_ly(x = days, y = days, z = ~var_mat) %>% 
-  add_surface(contours = list(z = list(show = TRUE, usecolormap = TRUE, project = list(z = TRUE)))) %>%
-  layout(scene = list(camera = list(eye = list(x = 1.87, y = 0.88, z = -0.64))))
-htmlwidgets::saveWidget(fig, "covariance_surface.html")
+# Save covariance surface plot as PNG using admiral or base plotting functions (not interactive)
+png(file.path(getwd(), "covariance_surface.png"), width = 800, height = 600)
+image(days, days, var_mat, main = "Covariance Surface")
+dev.off()
 
-# Display the saved interactive plot
-fig
+# Display the saved plots
